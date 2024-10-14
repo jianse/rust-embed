@@ -44,6 +44,31 @@ pub fn get_files(folder_path: String, matcher: PathMatcher) -> impl Iterator<Ite
     })
 }
 
+#[cfg_attr(all(debug_assertions, not(feature = "debug-embed")), allow(unused))]
+pub fn get_files_old(folder_path: String, matcher: PathMatcher) -> impl Iterator<Item = FileEntry> {
+  walkdir::WalkDir::new(&folder_path)
+    .follow_links(true)
+    .sort_by_file_name()
+    .into_iter()
+    .filter_map(|e| e.ok())
+    .filter(|e| e.file_type().is_file())
+    .filter_map(move |e| {
+      let rel_path = path_to_str(e.path().strip_prefix(&folder_path).unwrap());
+      let full_canonical_path = path_to_str(std::fs::canonicalize(e.path()).expect("Could not get canonical path"));
+
+      let rel_path = if std::path::MAIN_SEPARATOR == '\\' {
+        rel_path.replace('\\', "/")
+      } else {
+        rel_path
+      };
+      if matcher.is_path_included(&rel_path) {
+        Some(FileEntry { rel_path, full_canonical_path })
+      } else {
+        None
+      }
+    })
+}
+
 /// A file embedded into the binary
 #[derive(Clone)]
 pub struct EmbeddedFile {
